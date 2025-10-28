@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ESP32 Timer Control</title>
+  <style>
+    :root {
+      --primary-color: #000000;
+      --secondary-color: #e53935;
+      --background-color: #f5f6fa;
+      --card-color: #ffffff;
+      --text-color: #000000;
+      --light-text: #636e72;
+      --border-color: #e0e0e0;
+      --success-color: #00b894;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--background-color);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      color: var(--text-color);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(229, 57, 53, 0); }
+      50% { box-shadow: 0 0 30px rgba(229, 57, 53, 0.4); }
+    }
+
+    header {
+      background: var(--primary-color);
+      color: white;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    header .subtitle {
+      font-size: 13px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .status-badge {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-badge.disconnected {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .status-badge.connected {
+      background: var(--success-color);
+      color: white;
+    }
+
+    .status-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .header-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 10px 20px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .header-btn:hover {
+      background: var(--secondary-color);
+      transform: translateY(-2px);
+    }
+
+    .content {
+      flex: 1;
+      padding: 30px 20px;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 25px;
+      align-items: start;
+    }
+
+    .card {
+      background: var(--card-color);
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+      animation: slideUp 0.5s ease forwards;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    }
+
+    .card h2 {
+      margin: 0 0 20px 0;
+      font-size: 20px;
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card h2 .badge {
+      font-size: 12px;
+      background: var(--background-color);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: 500;
+      color: var(--light-text);
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-color);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input[type="number"] {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 16px;
+      border: 2px solid var(--border-color);
+      border-radius: 10px;
+      background-color: var(--card-color);
+      color: var(--text-color);
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    input[type="number"]:hover {
+      border-color: var(--secondary-color);
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: var(--secondary-color);
+      box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.1);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--border-color);
+      outline: none;
+      -webkit-appearance: none;
+      margin: 15px 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--secondary-color);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 10px rgba(229, 57, 53, 0.5);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--secondary-color);
+      cursor: pointer;
+      border: none;
+    }
+
+    .range-display {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .range-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--secondary-color);
+    }
+
+    .btn {
+      border: none;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #333;
+      transform: translateY(-2px);
+    }
+
+    .btn-danger {
+      background: var(--secondary-color);
+      color: white;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #c62828;
+      transform: translateY(-2px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 2px solid var(--border-color);
+      color: var(--text-color);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      border-color: var(--secondary-color);
+      color: var(--secondary-color);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .quick-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .quick-btn {
+      padding: 10px 16px;
+      border: 2px solid var(--border-color);
+      background: transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      color: var(--text-color);
+    }
+
+    .quick-btn:hover {
+      border-color: var(--secondary-color);
+      background: rgba(229, 57, 53, 0.05);
+      color: var(--secondary-color);
+      transform: translateY(-2px);
+    }
+
+    .progress-section {
+      padding: 20px;
+      background: var(--background-color);
+      border-radius: 12px;
+      margin: 20px 0;
+    }
+
+    .break-section {
+      padding: 20px;
+      background: var(--background-color);
+      border-radius: 12px;
+      margin: 20px 0;
+      border: 2px dashed var(--border-color);
+    }
+
+    .separator {
+      height: 2px;
+      background: linear-gradient(to right, transparent, var(--border-color), transparent);
+      margin: 25px 0;
+    }
+
+    .timeline-section {
+      margin: 20px 0;
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .timeline-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-small {
+      padding: 8px 16px;
+      border: 2px solid var(--border-color);
+      background: transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.3s ease;
+      color: var(--text-color);
+    }
+
+    .btn-small:hover {
+      border-color: var(--secondary-color);
+      color: var(--secondary-color);
+    }
+
+    .timeline {
+      min-height: 120px;
+      padding: 15px;
+      background: var(--background-color);
+      border-radius: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-start;
+      align-content: flex-start;
+    }
+
+    .timeline-empty {
+      width: 100%;
+      text-align: center;
+      color: var(--light-text);
+      font-size: 14px;
+      padding: 30px;
+    }
+
+    .timeline-block {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      transition: all 0.3s ease;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .timeline-block:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .timeline-block.work {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .timeline-block.break {
+      background: var(--secondary-color);
+      color: white;
+    }
+
+    .timeline-block .block-time {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .timeline-block .block-edit {
+      display: flex;
+      gap: 5px;
+    }
+
+    .timeline-block input {
+      width: 60px;
+      padding: 4px 8px;
+      border: none;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-weight: 600;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .timeline-block input:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .block-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .block-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .block-remove {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      transition: all 0.3s ease;
+    }
+
+    .block-remove:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .break-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 26px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: var(--secondary-color);
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+
+    .break-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .break-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .break-input-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-color);
+    }
+
+    .break-input-group input {
+      padding: 10px 12px;
+      font-size: 14px;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      background-color: var(--card-color);
+      color: var(--text-color);
+      transition: all 0.3s ease;
+    }
+
+    .break-input-group input:hover {
+      border-color: var(--secondary-color);
+    }
+
+    .break-input-group input:focus {
+      outline: none;
+      border-color: var(--secondary-color);
+      box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.1);
+    }
+
+    .break-input-group input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: var(--background-color);
+    }
+
+    .break-info {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(229, 57, 53, 0.05);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--light-text);
+      display: none;
+    }
+
+    .break-info.active {
+      display: block;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .progress-header strong {
+      font-size: 14px;
+    }
+
+    .time-remaining {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--secondary-color);
+    }
+
+    .progress-bar-container {
+      height: 12px;
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--secondary-color), #ff6b6b);
+      transition: width 0.4s cubic-bezier(0.2, 0.9, 0.2, 1);
+      border-radius: 999px;
+    }
+
+    .matrix-container {
+      padding: 20px;
+      background: var(--background-color);
+      border-radius: 12px;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.04);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cell.on {
+      background: var(--secondary-color);
+      box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
+      transform: scale(1.05);
+    }
+
+    .cell.highlight {
+      background: var(--secondary-color);
+      animation: glow 1.4s ease-in-out infinite;
+    }
+
+    .matrix-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .matrix-status.idle {
+      background: rgba(0, 0, 0, 0.04);
+      color: var(--light-text);
+    }
+
+    .matrix-status.complete {
+      background: var(--secondary-color);
+      color: white;
+      animation: glow 1.4s ease-in-out infinite;
+    }
+
+    .info-card {
+      padding: 20px;
+      background: linear-gradient(135deg, var(--secondary-color), #c62828);
+      color: white;
+      border-radius: 12px;
+      margin-top: 25px;
+    }
+
+    .info-card h3 {
+      margin: 0 0 15px 0;
+      font-size: 18px;
+    }
+
+    .info-card ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .info-card li {
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .info-card code {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: var(--light-text);
+      font-size: 13px;
+    }
+
+    @media (max-width: 968px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+      }
+
+      .header-controls {
+        justify-content: space-between;
+      }
+
+      .quick-buttons {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>ESP32 Timer Control</h1>
+      <div class="subtitle">Web Serial API Interface — 115200 Baud</div>
+    </div>
+    <div class="header-controls">
+      <div id="connectionStatus" class="status-badge disconnected">
+        Disconnected
+      </div>
+      <button id="connectBtn" class="header-btn">Connect Device</button>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="grid">
+      <!-- Left Column: Controls -->
+      <div>
+        <div class="card">
+          <h2>
+            Timer Configuration
+            <span class="badge">1-3600 seconds</span>
+          </h2>
+
+          <div class="input-group">
+            <label>Add Working Time</label>
+            <div class="input-row">
+              <input id="workInput" type="number" min="1" max="3600" placeholder="Seconds" />
+              <button id="addWorkBtn" class="btn btn-primary">+</button>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Add Break Time</label>
+            <div class="input-row">
+              <input id="breakInput" type="number" min="1" max="3600" placeholder="Seconds" />
+              <button id="addBreakBtn" class="btn btn-danger">+</button>
+            </div>
+          </div>
+
+          <div class="separator"></div>
+
+          <div class="timeline-section">
+            <div class="timeline-header">
+              <strong>Timeline</strong>
+              <div class="timeline-actions">
+                <button id="clearTimelineBtn" class="btn-small">Clear All</button>
+                <button id="sendBtn" class="btn btn-primary" disabled>Send to Device</button>
+              </div>
+            </div>
+            <div id="timeline" class="timeline">
+              <div class="timeline-empty">No blocks added yet. Add work or break time above.</div>
+            </div>
+          </div>
+
+          <div class="separator"></div>
+
+          <div class="progress-section">
+            <div class="progress-header">
+              <strong>Progress</strong>
+              <span id="timeRemaining" class="time-remaining">—</span>
+            </div>
+            <div class="progress-bar-container">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Matrix & Info -->
+      <div>
+        <div class="card">
+          <h2>
+            Visual Matrix
+            <span class="badge">8×8 Grid</span>
+          </h2>
+          
+          <div class="matrix-container">
+            <div id="matrix" class="matrix"></div>
+            <div id="matrixStatus" class="matrix-status idle">
+              ⏱️ Idle
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>📘 How to Use</h3>
+          <ol>
+            <li>Click <strong>Connect Device</strong> and select your ESP32/WEMOS from the serial port list.</li>
+            <li>Set your desired timer duration (1-3600 seconds) using the input or slider.</li>
+            <li>Press <strong>Send</strong> to transmit the value to your device (sends number + <code>\n</code>).</li>
+            <li>Monitor progress through the visual matrix. When complete, the glory animation activates!</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Requires secure context (HTTPS or localhost) and Chromium-based browser with Web Serial API support
+  </footer>
+
+  <script>
+    // UI elements
+    const connectBtn = document.getElementById('connectBtn');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const sendBtn = document.getElementById('sendBtn');
+    const workInput = document.getElementById('workInput');
+    const breakInput = document.getElementById('breakInput');
+    const addWorkBtn = document.getElementById('addWorkBtn');
+    const addBreakBtn = document.getElementById('addBreakBtn');
+    const timeline = document.getElementById('timeline');
+    const clearTimelineBtn = document.getElementById('clearTimelineBtn');
+    const progressBar = document.getElementById('progressBar');
+    const timeRemainingEl = document.getElementById('timeRemaining');
+    const matrix = document.getElementById('matrix');
+    const matrixStatus = document.getElementById('matrixStatus');
+
+    // Timeline blocks array
+    let timelineBlocks = [];
+
+    function formatTime(seconds) {
+      if (seconds >= 3600) {
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        if (mins === 0 && secs === 0) return `${hours}h`;
+        if (secs === 0) return `${hours}h ${mins}m`;
+        return `${hours}h ${mins}m ${secs}s`;
+      } else if (seconds >= 60) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        if (secs === 0) return `${mins}m`;
+        return `${mins}m ${secs}s`;
+      }
+      return `${seconds}s`;
+    }
+
+    function renderTimeline() {
+      timeline.innerHTML = '';
+      
+      if (timelineBlocks.length === 0) {
+        timeline.innerHTML = '<div class="timeline-empty">No blocks added yet. Add work or break time above.</div>';
+        sendBtn.disabled = true;
+        return;
+      }
+
+      sendBtn.disabled = false;
+
+      timelineBlocks.forEach((block, index) => {
+        const blockEl = document.createElement('div');
+        blockEl.className = `timeline-block ${block.type}`;
+        
+        blockEl.innerHTML = `
+          <div class="block-time">
+            <span>${block.type === 'work' ? '⏱️' : '☕'}</span>
+            <input type="number" min="1" max="3600" value="${block.seconds}" data-index="${index}">
+            <span>s (${formatTime(block.seconds)})</span>
+          </div>
+          <button class="block-remove" data-index="${index}">×</button>
+        `;
+        
+        timeline.appendChild(blockEl);
+      });
+
+      // Add event listeners for inline editing
+      timeline.querySelectorAll('input[type="number"]').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const index = parseInt(e.target.dataset.index);
+          const newValue = parseInt(e.target.value);
+          if (!isNaN(newValue) && newValue > 0 && newValue <= 3600) {
+            timelineBlocks[index].seconds = newValue;
+            renderTimeline();
+          }
+        });
+      });
+
+      // Add event listeners for remove buttons
+      timeline.querySelectorAll('.block-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const index = parseInt(e.target.dataset.index);
+          timelineBlocks.splice(index, 1);
+          renderTimeline();
+        });
+      });
+    }
+
+    // Add work block
+    addWorkBtn.addEventListener('click', () => {
+      const seconds = parseInt(workInput.value);
+      if (isNaN(seconds) || seconds < 1 || seconds > 3600) {
+        alert('Enter a valid number between 1 and 3600');
+        return;
+      }
+      timelineBlocks.push({ type: 'work', seconds });
+      workInput.value = '';
+      renderTimeline();
+    });
+
+    // Add break block
+    addBreakBtn.addEventListener('click', () => {
+      const seconds = parseInt(breakInput.value);
+      if (isNaN(seconds) || seconds < 1 || seconds > 3600) {
+        alert('Enter a valid number between 1 and 3600');
+        return;
+      }
+      timelineBlocks.push({ type: 'break', seconds });
+      breakInput.value = '';
+      renderTimeline();
+    });
+
+    // Clear timeline
+    clearTimelineBtn.addEventListener('click', () => {
+      if (timelineBlocks.length > 0) {
+        if (confirm('Clear all blocks?')) {
+          timelineBlocks = [];
+          renderTimeline();
+        }
+      }
+    });
+
+    // Allow Enter key to add blocks
+    workInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addWorkBtn.click();
+      }
+    });
+
+    breakInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addBreakBtn.click();
+      }
+    });
+
+    // Build 8x8 grid
+    const cells = [];
+    for (let i = 0; i < 64; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      matrix.appendChild(cell);
+      cells.push(cell);
+    }
+
+    // Initial render
+    renderTimeline();
+
+    // Serial port state
+    let port = null;
+    let writer = null;
+    let keepReading = false;
+    let reader = null;
+    let decoder = new TextDecoderStream();
+    let inputDone = null;
+
+    // Progress tracking
+    let remoteMax = null;
+    let remoteRemaining = null;
+    let currentBlockIndex = 0;
+    let isBreakMode = false;
+    let timerInterval = null;
+
+    function setStatus(connected) {
+      if (connected) {
+        connectionStatus.className = 'status-badge connected';
+        connectionStatus.textContent = 'Connected';
+        connectBtn.textContent = 'Disconnect';
+        sendBtn.disabled = false;
+      } else {
+        connectionStatus.className = 'status-badge disconnected';
+        connectionStatus.textContent = 'Disconnected';
+        connectBtn.textContent = 'Connect Device';
+        sendBtn.disabled = true;
+        matrixStatus.className = 'matrix-status idle';
+        matrixStatus.textContent = '⏱️ Idle';
+      }
+    }
+
+    async function connectSerial() {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        writer = port.writable.getWriter();
+
+        inputDone = port.readable.pipeTo(decoder.writable);
+        reader = decoder.readable.getReader();
+        keepReading = true;
+        readLoop();
+
+        setStatus(true);
+      } catch (err) {
+        console.error(err);
+        alert('Serial connection failed: ' + err.message);
+      }
+    }
+
+    async function disconnectSerial() {
+      try {
+        keepReading = false;
+        if (reader) {
+          await reader.cancel();
+          reader.releaseLock();
+          reader = null;
+        }
+        if (inputDone) {
+          await inputDone.catch(() => {});
+          inputDone = null;
+        }
+        if (writer) {
+          try { writer.releaseLock(); } catch {}
+          writer = null;
+        }
+        if (port) {
+          await port.close();
+          port = null;
+        }
+        setStatus(false);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function readLoop() {
+      try {
+        while (keepReading) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) {
+            handleSerialText(value);
+          }
+        }
+      } catch (err) {
+        console.warn('Read loop ended', err);
+      }
+    }
+
+    function handleSerialText(chunk) {
+      const lines = chunk.split(/\r?\n/).filter(Boolean);
+      for (const line of lines) {
+        if (line.startsWith('Timer set:')) {
+          const m = line.match(/Timer set:\s*(\d+)/);
+          if (m) {
+            remoteMax = parseInt(m[1], 10);
+          }
+        }
+
+        if (line.includes('Time remaining:')) {
+          const m = line.match(/Time remaining:\s*(\d+)s/);
+          if (m) {
+            remoteRemaining = parseInt(m[1], 10);
+            updateProgressFromRemote();
+          }
+        }
+
+        if (line.includes('COMPLETE')) {
+          remoteRemaining = 0;
+          updateProgressFromRemote();
+          handleBlockComplete();
+        }
+      }
+    }
+
+    async function handleBlockComplete() {
+      // Current block is complete
+      triggerGlory();
+      
+      // Move to next block
+      currentBlockIndex++;
+      
+      // Wait a bit before sending next block
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      if (currentBlockIndex < timelineBlocks.length) {
+        // Send next block
+        const nextBlock = timelineBlocks[currentBlockIndex];
+        isBreakMode = nextBlock.type === 'break';
+        
+        if (isBreakMode) {
+          // Show break pattern on matrix
+          showBreakPattern();
+          matrixStatus.className = 'matrix-status complete';
+          matrixStatus.textContent = '☕ Break Time';
+        } else {
+          // Reset to normal mode
+          clearBreakPattern();
+          matrixStatus.className = 'matrix-status idle';
+          matrixStatus.textContent = '⏱️ Working';
+        }
+        
+        // Send the next block
+        try {
+          let message;
+          if (nextBlock.type === 'work') {
+            message = String(nextBlock.seconds) + '\n';
+          } else {
+            message = String(nextBlock.seconds) + '\\b\n';
+          }
+          await writer.write(new TextEncoder().encode(message));
+          
+          // Reset for new timer
+          remoteMax = nextBlock.seconds;
+          remoteRemaining = nextBlock.seconds;
+        } catch (err) {
+          console.error('Failed to send next block:', err);
+        }
+      } else {
+        // All blocks complete
+        matrixStatus.className = 'matrix-status complete';
+        matrixStatus.textContent = '✨ All Complete!';
+        currentBlockIndex = 0;
+        isBreakMode = false;
+      }
+    }
+
+    function showBreakPattern() {
+      // Break pattern: B shape
+      const breakPattern = [
+        0b11111110,
+        0b10000010,
+        0b10000010,
+        0b11111110,
+        0b10000010,
+        0b10000010,
+        0b10000010,
+        0b11111110
+      ];
+      
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const index = row * 8 + col;
+          const bit = (breakPattern[row] >> (7 - col)) & 1;
+          if (bit === 1) {
+            cells[index].classList.add('on');
+            cells[index].classList.remove('highlight');
+          } else {
+            cells[index].classList.remove('on');
+            cells[index].classList.remove('highlight');
+          }
+        }
+      }
+    }
+
+    function clearBreakPattern() {
+      for (let i = 0; i < 64; i++) {
+        cells[i].classList.remove('on');
+        cells[i].classList.remove('highlight');
+      }
+    }
+
+    function updateProgressFromRemote() {
+      if (remoteMax == null || remoteRemaining == null) return;
+      const progress = 1 - Math.max(0, remoteRemaining) / Math.max(1, remoteMax);
+      setProgress(progress);
+      timeRemainingEl.textContent = remoteRemaining + 's';
+      
+      // Update matrix based on mode
+      if (isBreakMode) {
+        // Keep break pattern visible during break time
+        showBreakPattern();
+      }
+    }
+
+    function setProgress(progress) {
+      const pct = Math.round(progress * 100);
+      progressBar.style.width = pct + '%';
+
+      // Only update cells if not in break mode
+      if (!isBreakMode) {
+        const n = Math.round(progress * 64);
+        for (let i = 0; i < 64; i++) {
+          if (i < n) {
+            cells[i].classList.add('on');
+            cells[i].classList.remove('highlight');
+          } else {
+            cells[i].classList.remove('on');
+            cells[i].classList.remove('highlight');
+          }
+        }
+      }
+    }
+
+    function triggerGlory() {
+      for (let i = 0; i < 64; i++) {
+        cells[i].classList.add('on');
+        cells[i].classList.add('highlight');
+      }
+      
+      matrixStatus.className = 'matrix-status complete';
+      matrixStatus.textContent = '✨ Complete!';
+
+      setTimeout(() => {
+        for (let i = 0; i < 64; i++) {
+          cells[i].classList.remove('highlight');
+        }
+        matrixStatus.className = 'matrix-status idle';
+        matrixStatus.textContent = '⏱️ Idle';
+      }, 4000);
+    }
+
+    async function sendSeconds(val) {
+      if (!port || !writer) {
+        alert('Not connected to a serial device.');
+        return;
+      }
+
+      if (timelineBlocks.length === 0) {
+        alert('No blocks to send. Add work or break time first.');
+        return;
+      }
+
+      try {
+        // Reset state
+        currentBlockIndex = 0;
+        isBreakMode = false;
+        
+        // Send first block only
+        const firstBlock = timelineBlocks[0];
+        isBreakMode = firstBlock.type === 'break';
+        
+        let message;
+        if (firstBlock.type === 'work') {
+          message = String(firstBlock.seconds) + '\n';
+          matrixStatus.className = 'matrix-status idle';
+          matrixStatus.textContent = '⏱️ Working';
+        } else {
+          message = String(firstBlock.seconds) + '\\b\n';
+          showBreakPattern();
+          matrixStatus.className = 'matrix-status complete';
+          matrixStatus.textContent = '☕ Break Time';
+        }
+        
+        await writer.write(new TextEncoder().encode(message));
+        
+        // Set initial progress tracking
+        remoteMax = firstBlock.seconds;
+        remoteRemaining = firstBlock.seconds;
+        
+      } catch (err) {
+        console.error(err);
+        alert('Write failed: ' + err.message);
+      }
+    }
+
+    // Event listeners
+    connectBtn.addEventListener('click', async () => {
+      if (port) {
+        await disconnectSerial();
+      } else {
+        await connectSerial();
+      }
+    });
+
+    sendBtn.addEventListener('click', async () => {
+      await sendSeconds();
+    });
+
+    secondsInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        await sendSeconds();
+      }
+    });
+
+    window.addEventListener('beforeunload', async () => {
+      if (port) {
+        try {
+          await disconnectSerial();
+        } catch {}
+      }
+    });
+
+    // Check Web Serial API support
+    if (!('serial' in navigator)) {
+      connectBtn.disabled = true;
+      connectBtn.textContent = 'Web Serial Unsupported';
+      connectionStatus.textContent = 'Unavailable';
+    }
+  </script>
+</body>
+</html>
